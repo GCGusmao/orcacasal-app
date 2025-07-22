@@ -81,11 +81,13 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, children }) => (
     </Modal>
 );
 
-const EditTransactionModal = ({ isOpen, onClose, transaction, onSave }) => {
+const EditTransactionModal = ({ isOpen, onClose, transaction, onSave, household }) => {
     const [amount, setAmount] = useState('');
     const [description, setDescription] = useState('');
     const [tag, setTag] = useState('');
     const [date, setDate] = useState('');
+    const [suggestions, setSuggestions] = useState([]);
+    const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false);
 
     useEffect(() => {
         if (transaction) {
@@ -97,6 +99,25 @@ const EditTransactionModal = ({ isOpen, onClose, transaction, onSave }) => {
     }, [transaction]);
 
     if (!transaction) return null;
+
+    const handleTagChange = (e) => {
+        const value = e.target.value;
+        setTag(value);
+        if (value) {
+            const allTags = Object.keys(household.tags || {});
+            const filtered = allTags.filter(t => t.toLowerCase().includes(value.toLowerCase()));
+            setSuggestions(filtered);
+            setIsSuggestionsOpen(true);
+        } else {
+            setSuggestions([]);
+            setIsSuggestionsOpen(false);
+        }
+    };
+
+    const handleSuggestionClick = (suggestion) => {
+        setTag(suggestion);
+        setIsSuggestionsOpen(false);
+    };
 
     const handleSave = () => {
         onSave({
@@ -114,7 +135,32 @@ const EditTransactionModal = ({ isOpen, onClose, transaction, onSave }) => {
             <div className="space-y-4">
                 <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Valor" className="p-2 border rounded-md w-full bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600" />
                 <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Descrição" className="p-2 border rounded-md w-full bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600" />
-                <input type="text" value={tag} onChange={e => setTag(e.target.value)} placeholder="Tag" className="p-2 border rounded-md w-full bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600" />
+                <div className="relative">
+                    <input 
+                        type="text" 
+                        value={tag} 
+                        onChange={handleTagChange} 
+                        onFocus={() => setIsSuggestionsOpen(true)}
+                        onBlur={() => setTimeout(() => setIsSuggestionsOpen(false), 150)}
+                        placeholder="Tag" 
+                        className="p-2 border rounded-md w-full bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600" 
+                        autoComplete="off"
+                    />
+                     {isSuggestionsOpen && suggestions.length > 0 && (
+                        <ul className="absolute z-20 w-full bg-white dark:bg-gray-800 border dark:border-gray-600 rounded-md mt-1 max-h-40 overflow-y-auto shadow-lg">
+                            {suggestions.map(s => (
+                                <li 
+                                    key={s} 
+                                    onMouseDown={() => handleSuggestionClick(s)}
+                                    className="px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 flex items-center gap-2"
+                                >
+                                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: household.tags[s]?.color || '#ccc' }}></span>
+                                    {s}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
                 <input type="date" value={date} onChange={e => setDate(e.target.value)} className="p-2 border rounded-md w-full bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600" />
             </div>
             <div className="flex justify-end gap-3 mt-6">
@@ -280,6 +326,13 @@ const TransactionForm = ({ householdId, type, household }) => {
         setTag(suggestion);
         setIsSuggestionsOpen(false);
     };
+
+    const handleDeleteTag = async (tagToDelete) => {
+        const newTags = { ...household.tags };
+        delete newTags[tagToDelete];
+        const householdRef = doc(db, 'households', householdId);
+        await setDoc(householdRef, { tags: newTags }, { merge: true });
+    };
     
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -290,7 +343,6 @@ const TransactionForm = ({ householdId, type, household }) => {
         const householdRef = doc(db, 'households', householdId);
         const allTags = household.tags || {};
 
-        // Verifica se a tag é nova e a adiciona com uma cor aleatória
         if (!allTags[tag]) {
             const randomColor = `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`;
             const newTags = { ...allTags, [tag]: { color: randomColor } };
@@ -336,21 +388,29 @@ const TransactionForm = ({ householdId, type, household }) => {
                         value={tag} 
                         onChange={handleTagChange} 
                         onFocus={() => setIsSuggestionsOpen(true)}
-                        onBlur={() => setTimeout(() => setIsSuggestionsOpen(false), 150)} // Delay para permitir o clique na sugestão
+                        onBlur={() => setTimeout(() => setIsSuggestionsOpen(false), 150)}
                         placeholder="Tag (ex: Alimentação)" 
                         className="p-2 border rounded-md w-full bg-white dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600" 
                         autoComplete="off"
                     />
-                    {isSuggestionsOpen && suggestions.length > 0 && (
+                    {isSuggestionsOpen && (
                         <ul className="absolute z-10 w-full bg-white dark:bg-gray-800 border dark:border-gray-600 rounded-md mt-1 max-h-40 overflow-y-auto shadow-lg">
                             {suggestions.map(s => (
                                 <li 
                                     key={s} 
-                                    onMouseDown={() => handleSuggestionClick(s)}
-                                    className="px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 flex items-center gap-2"
+                                    className="px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 flex items-center justify-between gap-2"
                                 >
-                                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: household.tags[s]?.color || '#ccc' }}></span>
-                                    {s}
+                                    <div onMouseDown={() => handleSuggestionClick(s)} className="flex items-center gap-2 w-full">
+                                        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: household.tags[s]?.color || '#ccc' }}></span>
+                                        <span>{s}</span>
+                                    </div>
+                                    <button 
+                                        type="button"
+                                        onMouseDown={(e) => { e.stopPropagation(); handleDeleteTag(s); }} 
+                                        className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 font-bold"
+                                    >
+                                        &times;
+                                    </button>
                                 </li>
                             ))}
                         </ul>
@@ -598,6 +658,17 @@ const Dashboard = ({ user, householdId, household, transactions, theme, onThemeT
 
     const handleSaveTransaction = async (updatedTransaction) => {
         const transRef = doc(db, 'transactions', updatedTransaction.id);
+        const householdRef = doc(db, 'households', householdId);
+        const allTags = household.tags || {};
+        const tag = updatedTransaction.tag;
+
+        // Adiciona a nova tag se ela não existir
+        if (!allTags[tag]) {
+            const randomColor = `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`;
+            const newTags = { ...allTags, [tag]: { color: randomColor } };
+            await setDoc(householdRef, { tags: newTags }, { merge: true });
+        }
+
         try {
             await setDoc(transRef, updatedTransaction, { merge: true });
             handleCloseModals();
@@ -675,7 +746,7 @@ const Dashboard = ({ user, householdId, household, transactions, theme, onThemeT
             </main>
 
             <WeekSettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} household={household} householdId={householdId} />
-            <EditTransactionModal isOpen={!!editingTransaction} onClose={handleCloseModals} transaction={editingTransaction} onSave={handleSaveTransaction} />
+            <EditTransactionModal isOpen={!!editingTransaction} onClose={handleCloseModals} transaction={editingTransaction} onSave={handleSaveTransaction} household={household} />
             <ConfirmationModal isOpen={!!deletingTransaction} onClose={handleCloseModals} onConfirm={handleDeleteConfirm} title="Confirmar Exclusão">
                 <p>Você tem certeza que deseja excluir esta transação?</p>
                 <p className="font-semibold mt-2">{deletingTransaction?.description}: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deletingTransaction?.amount || 0)}</p>
