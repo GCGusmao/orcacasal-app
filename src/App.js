@@ -120,12 +120,13 @@ const EditTransactionModal = ({ isOpen, onClose, transaction, onSave, household,
     };
 
     const handleSave = () => {
+        const localDate = new Date(`${date}T00:00:00`);
         onSave({
             ...transaction,
             amount: -Math.abs(parseFloat(amount) || 0),
             description,
             tag,
-            date: Timestamp.fromDate(new Date(date))
+            date: Timestamp.fromDate(localDate)
         });
     };
 
@@ -357,7 +358,8 @@ const TransactionForm = ({ householdId, type, household, onDeleteTag }) => {
         const batch = writeBatch(db);
         const installmentId = crypto.randomUUID();
         for (let i = 0; i < installments; i++) {
-            const transactionDate = new Date(date);
+            const localDate = new Date(`${date}T00:00:00`);
+            const transactionDate = new Date(localDate);
             transactionDate.setMonth(transactionDate.getMonth() + i);
             const newTransaction = {
                 householdId, amount: -Math.abs(numericAmount / installments),
