@@ -34,6 +34,8 @@ const TrashIcon = ({ className = "w-5 h-5" }) => (<svg xmlns="http://www.w3.org/
 const CloseIcon = ({ className = "w-6 h-6" }) => (<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>);
 const SunIcon = ({ className = "w-6 h-6" }) => (<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" /></svg>);
 const MoonIcon = ({ className = "w-6 h-6" }) => (<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}><path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" /></svg>);
+const MenuIcon = ({ className = "w-6 h-6" }) => (<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>);
+const CogIcon = ({ className = "w-5 h-5" }) => (<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12a7.5 7.5 0 0015 0m-15 0a7.5 7.5 0 1115 0m-15 0H3m18 0h-1.5m-15 0a7.5 7.5 0 1115 0m-15 0H3m18 0h-1.5m-15 0a7.5 7.5 0 1115 0m-15 0H3m18 0h-1.5" /></svg>);
 
 
 // --- Configuração e Inicialização do Firebase (Fora do Componente) ---
@@ -123,6 +125,44 @@ const EditTransactionModal = ({ isOpen, onClose, transaction, onSave }) => {
     );
 };
 
+const WeekSettingsModal = ({ isOpen, onClose, household, householdId }) => {
+    const weekDays = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+    
+    const handleWeekStartChange = async (e) => {
+        const newStartDay = parseInt(e.target.value, 10);
+        if (!isNaN(newStartDay)) {
+            const householdRef = doc(db, 'households', householdId);
+            try {
+                await setDoc(householdRef, { weekStartsOn: newStartDay }, { merge: true });
+            } catch (error) {
+                console.error("Erro ao atualizar o dia de início da semana:", error);
+            }
+        }
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose}>
+            <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100 mb-4">Configurar Semana</h3>
+            <div className="flex items-center justify-between">
+                <label htmlFor="week-start-day" className="text-gray-700 dark:text-gray-300">O ciclo semanal começa na:</label>
+                <select
+                    id="week-start-day"
+                    value={household.weekStartsOn ?? 1}
+                    onChange={handleWeekStartChange}
+                    className="p-2 border rounded-md bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500"
+                >
+                    {weekDays.map((day, index) => (
+                        <option key={index} value={index}>{day}</option>
+                    ))}
+                </select>
+            </div>
+            <div className="flex justify-end mt-6">
+                <button onClick={onClose} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Fechar</button>
+            </div>
+        </Modal>
+    );
+};
+
 
 // --- Componentes Principais ---
 const AuthComponent = () => {
@@ -161,6 +201,8 @@ const HouseholdSetup = ({ user, setHouseholdId }) => {
             const newHousehold = {
                 members: [user.uid],
                 weeklyBudget: 500,
+                weekStartsOn: 1, // Padrão: Segunda-feira
+                tags: {}, // Objeto de tags inicial
                 createdAt: Timestamp.now(),
             };
             await setDoc(newHouseholdRef, newHousehold);
@@ -211,18 +253,50 @@ const HouseholdSetup = ({ user, setHouseholdId }) => {
     );
 };
 
-const TransactionForm = ({ householdId, type }) => {
+const TransactionForm = ({ householdId, type, household }) => {
     const [amount, setAmount] = useState('');
     const [description, setDescription] = useState('');
     const [tag, setTag] = useState('');
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [installments, setInstallments] = useState(1);
+    const [suggestions, setSuggestions] = useState([]);
+    const [isSuggestionsOpen, setIsSuggestionsOpen] = useState(false);
+
+    const handleTagChange = (e) => {
+        const value = e.target.value;
+        setTag(value);
+        if (value) {
+            const allTags = Object.keys(household.tags || {});
+            const filtered = allTags.filter(t => t.toLowerCase().includes(value.toLowerCase()));
+            setSuggestions(filtered);
+            setIsSuggestionsOpen(true);
+        } else {
+            setSuggestions([]);
+            setIsSuggestionsOpen(false);
+        }
+    };
+
+    const handleSuggestionClick = (suggestion) => {
+        setTag(suggestion);
+        setIsSuggestionsOpen(false);
+    };
     
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!amount || !description || !tag) {
             alert("Por favor, preencha todos os campos."); return;
         }
+        
+        const householdRef = doc(db, 'households', householdId);
+        const allTags = household.tags || {};
+
+        // Verifica se a tag é nova e a adiciona com uma cor aleatória
+        if (!allTags[tag]) {
+            const randomColor = `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`;
+            const newTags = { ...allTags, [tag]: { color: randomColor } };
+            await setDoc(householdRef, { tags: newTags }, { merge: true });
+        }
+
         const numericAmount = parseFloat(amount);
         if (isNaN(numericAmount)) {
             alert("O valor deve ser um número."); return;
@@ -256,7 +330,32 @@ const TransactionForm = ({ householdId, type }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <input type="text" value={description} onChange={e => setDescription(e.target.value)} placeholder="Descrição (ex: Supermercado)" className="p-2 border rounded-md w-full bg-white dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600" />
                 <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Valor Total (R$)" className="p-2 border rounded-md w-full bg-white dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600" />
-                <input type="text" value={tag} onChange={e => setTag(e.target.value)} placeholder="Tag (ex: Alimentação)" className="p-2 border rounded-md w-full bg-white dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600" />
+                <div className="relative">
+                    <input 
+                        type="text" 
+                        value={tag} 
+                        onChange={handleTagChange} 
+                        onFocus={() => setIsSuggestionsOpen(true)}
+                        onBlur={() => setTimeout(() => setIsSuggestionsOpen(false), 150)} // Delay para permitir o clique na sugestão
+                        placeholder="Tag (ex: Alimentação)" 
+                        className="p-2 border rounded-md w-full bg-white dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600" 
+                        autoComplete="off"
+                    />
+                    {isSuggestionsOpen && suggestions.length > 0 && (
+                        <ul className="absolute z-10 w-full bg-white dark:bg-gray-800 border dark:border-gray-600 rounded-md mt-1 max-h-40 overflow-y-auto shadow-lg">
+                            {suggestions.map(s => (
+                                <li 
+                                    key={s} 
+                                    onMouseDown={() => handleSuggestionClick(s)}
+                                    className="px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 flex items-center gap-2"
+                                >
+                                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: household.tags[s]?.color || '#ccc' }}></span>
+                                    {s}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
                 <input type="date" value={date} onChange={e => setDate(e.target.value)} className="p-2 border rounded-md w-full bg-white dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600" />
             </div>
             {type === 'monthly' && (
@@ -270,7 +369,7 @@ const TransactionForm = ({ householdId, type }) => {
     );
 };
 
-const TransactionList = ({ transactions, onEdit, onDelete }) => {
+const TransactionList = ({ transactions, onEdit, onDelete, household }) => {
     const formatCurrency = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
     
     if (transactions.length === 0) {
@@ -279,21 +378,27 @@ const TransactionList = ({ transactions, onEdit, onDelete }) => {
 
     return (
         <ul className="space-y-3">
-            {transactions.map(t => (
-                <li key={t.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg group">
-                    <div>
-                        <p className="font-semibold text-gray-800 dark:text-gray-100">{t.description}</p>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">{t.tag} - {t.date.toDate().toLocaleDateString('pt-BR')}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <p className={`font-bold ${t.amount < 0 ? 'text-red-500' : 'text-green-500'}`}>{formatCurrency(t.amount)}</p>
-                        <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
-                             <button onClick={() => onEdit(t)} className="p-1 text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400"><PencilIcon className="w-4 h-4" /></button>
-                             <button onClick={() => onDelete(t)} className="p-1 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"><TrashIcon className="w-4 h-4" /></button>
+            {transactions.map(t => {
+                const tagColor = household.tags?.[t.tag]?.color || '#cccccc';
+                return (
+                    <li key={t.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg group">
+                        <div>
+                            <p className="font-semibold text-gray-800 dark:text-gray-100">{t.description}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: tagColor }}></span>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">{t.tag} - {t.date.toDate().toLocaleDateString('pt-BR')}</p>
+                            </div>
                         </div>
-                    </div>
-                </li>
-            ))}
+                        <div className="flex items-center gap-2">
+                            <p className={`font-bold ${t.amount < 0 ? 'text-red-500' : 'text-green-500'}`}>{formatCurrency(t.amount)}</p>
+                            <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => onEdit(t)} className="p-1 text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400"><PencilIcon className="w-4 h-4" /></button>
+                                <button onClick={() => onDelete(t)} className="p-1 text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"><TrashIcon className="w-4 h-4" /></button>
+                            </div>
+                        </div>
+                    </li>
+                )
+            })}
         </ul>
     )
 }
@@ -303,21 +408,30 @@ const WeeklyView = ({ householdId, household, transactions, handleEdit, handleDe
 
     const { weeklyExpenses, remainingBudget } = useMemo(() => {
         const now = new Date();
+        const weekStartsOn = household.weekStartsOn ?? 1; // 0=Dom, 1=Seg, ...
         const dayOfWeek = now.getDay();
-        const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-        const startOfWeek = new Date(now.setDate(diff));
+
+        let diff = now.getDate() - dayOfWeek + weekStartsOn;
+        if (dayOfWeek < weekStartsOn) {
+            diff -= 7;
+        }
+
+        const startOfWeek = new Date(new Date().setDate(diff));
         startOfWeek.setHours(0, 0, 0, 0);
+
         const endOfWeek = new Date(startOfWeek);
         endOfWeek.setDate(endOfWeek.getDate() + 6);
         endOfWeek.setHours(23, 59, 59, 999);
+
         const weeklyExpenses = transactions.filter(t => {
             const tDate = t.date.toDate();
             return tDate >= startOfWeek && tDate <= endOfWeek;
         }).sort((a, b) => b.date.toDate() - a.date.toDate());
+
         const totalSpent = weeklyExpenses.reduce((sum, t) => sum + t.amount, 0);
         const remainingBudget = (household.weeklyBudget || 0) + totalSpent;
         return { weeklyExpenses, remainingBudget };
-    }, [transactions, household.weeklyBudget]);
+    }, [transactions, household.weeklyBudget, household.weekStartsOn]);
 
     const handleBudgetUpdate = async () => {
         const budgetValue = parseFloat(newBudget);
@@ -344,16 +458,17 @@ const WeeklyView = ({ householdId, household, transactions, handleEdit, handleDe
                     <p className="text-3xl font-bold">{formatCurrency(remainingBudget)}</p>
                 </div>
             </div>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md"><TransactionForm householdId={householdId} type="weekly" /></div>
+
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md"><TransactionForm householdId={householdId} type="weekly" household={household} /></div>
             <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
                 <h3 className="font-bold text-xl mb-4 text-gray-800 dark:text-gray-100">Gastos da Semana</h3>
-                <TransactionList transactions={weeklyExpenses} onEdit={handleEdit} onDelete={handleDelete} />
+                <TransactionList transactions={weeklyExpenses} onEdit={handleEdit} onDelete={handleDelete} household={household} />
             </div>
         </div>
     );
 };
 
-const MonthlyView = ({ householdId, transactions, handleEdit, handleDelete }) => {
+const MonthlyView = ({ householdId, transactions, handleEdit, handleDelete, household }) => {
     const [analysis, setAnalysis] = useState("");
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [viewDate, setViewDate] = useState(new Date());
@@ -371,9 +486,13 @@ const MonthlyView = ({ householdId, transactions, handleEdit, handleDelete }) =>
             acc[t.tag] = (acc[t.tag] || 0) + Math.abs(t.amount);
             return acc;
         }, {});
-        const tagData = Object.keys(tagTotals).map(tag => ({ name: tag, value: tagTotals[tag] }));
+        const tagData = Object.keys(tagTotals).map(tag => ({ 
+            name: tag, 
+            value: tagTotals[tag],
+            fill: household.tags?.[tag]?.color || '#cccccc' // Usa a cor da tag
+        }));
         return { monthlyExpenses, tagData };
-    }, [transactions, viewDate]);
+    }, [transactions, viewDate, household.tags]);
     
     const handleAnalysis = async () => {
         setIsAnalyzing(true);
@@ -413,7 +532,6 @@ const MonthlyView = ({ householdId, transactions, handleEdit, handleDelete }) =>
         setAnalysis("");
     };
 
-    const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF1943'];
     const monthName = viewDate.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
 
     return (
@@ -431,9 +549,11 @@ const MonthlyView = ({ householdId, transactions, handleEdit, handleDelete }) =>
                     <div style={{ width: '100%', height: 300 }}>
                         <ResponsiveContainer>
                             <PieChart>
-                                <Pie data={tagData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} fill="#8884d8" label>{tagData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}</Pie>
+                                <Pie data={tagData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                                    {tagData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.fill} />)}
+                                </Pie>
                                 <Tooltip formatter={(value) => formatCurrency(value)} />
-                                <Legend wrapperStyle={{color: 'red'}}/>
+                                <Legend />
                             </PieChart>
                         </ResponsiveContainer>
                     </div>
@@ -448,10 +568,10 @@ const MonthlyView = ({ householdId, transactions, handleEdit, handleDelete }) =>
                 {isAnalyzing && (<div className="flex justify-center items-center p-8"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-indigo-500"></div></div>)}
                 {analysis && (<div className="mt-4 p-4 bg-indigo-50 dark:bg-gray-700/50 border border-indigo-200 dark:border-gray-600 rounded-lg whitespace-pre-wrap font-sans text-gray-700 dark:text-gray-300">{analysis}</div>)}
             </div>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md"><TransactionForm householdId={householdId} type="monthly" /></div>
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md"><TransactionForm householdId={householdId} type="monthly" household={household} /></div>
             <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
                 <h3 className="font-bold text-xl mb-4 text-gray-800 dark:text-gray-100">Todas as Transações do Mês</h3>
-                <TransactionList transactions={monthlyExpenses} onEdit={handleEdit} onDelete={handleDelete} />
+                <TransactionList transactions={monthlyExpenses} onEdit={handleEdit} onDelete={handleDelete} household={household} />
             </div>
         </div>
     );
@@ -462,6 +582,8 @@ const Dashboard = ({ user, householdId, household, transactions, theme, onThemeT
     const [editingTransaction, setEditingTransaction] = useState(null);
     const [deletingTransaction, setDeletingTransaction] = useState(null);
     const [deleteScope, setDeleteScope] = useState('single');
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
     const handleSignOut = async () => { try { await signOut(auth); } catch (error) { console.error("Erro ao fazer logout:", error); } };
     const copyToClipboard = () => { navigator.clipboard.writeText(householdId).then(() => alert('ID do Lar copiado!'), (err) => console.error('Falha ao copiar: ', err)); };
@@ -512,14 +634,33 @@ const Dashboard = ({ user, householdId, household, transactions, theme, onThemeT
             <header className="bg-white dark:bg-gray-800 shadow-sm">
                 <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
                     <div className="flex items-center gap-3 text-gray-900 dark:text-gray-100"><WalletIcon /><h1 className="text-2xl font-bold">OrçaCasal</h1></div>
-                    <div className="flex items-center gap-4">
-                        <div className="text-sm text-gray-600 dark:text-gray-300"><span>ID do Lar: </span><span className="font-mono bg-gray-200 dark:bg-gray-700 p-1 rounded-md cursor-pointer" onClick={copyToClipboard} title="Clique para copiar">{householdId}</span></div>
-                        <button onClick={onThemeToggle} className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                            {theme === 'light' ? <MoonIcon /> : <SunIcon />}
+                    <div className="relative">
+                        <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                            <MenuIcon />
                         </button>
-                        <button onClick={handleSignOut} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition">
-                            <LogoutIcon />Sair
-                        </button>
+                        {isMenuOpen && (
+                            <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl z-10 border border-gray-200 dark:border-gray-700">
+                                <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">ID do Lar</p>
+                                    <p onClick={copyToClipboard} className="font-mono text-sm bg-gray-100 dark:bg-gray-700 p-1 rounded-md cursor-pointer text-gray-700 dark:text-gray-200" title="Clique para copiar">{householdId}</p>
+                                </div>
+                                <div className="py-2">
+                                    <button onClick={() => { onThemeToggle(); setIsMenuOpen(false); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3">
+                                        {theme === 'light' ? <MoonIcon className="w-5 h-5"/> : <SunIcon className="w-5 h-5" />}
+                                        Alternar Tema
+                                    </button>
+                                    <button onClick={() => { setIsSettingsModalOpen(true); setIsMenuOpen(false); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3">
+                                        <CogIcon />
+                                        Configurar Semana
+                                    </button>
+                                </div>
+                                <div className="border-t border-gray-200 dark:border-gray-700">
+                                    <button onClick={handleSignOut} className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3">
+                                        <LogoutIcon />Sair
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </header>
@@ -530,9 +671,10 @@ const Dashboard = ({ user, householdId, household, transactions, theme, onThemeT
                 </nav></div></div>
                 
                 {activeTab === 'weekly' && <WeeklyView householdId={householdId} household={household} transactions={transactions} handleEdit={handleOpenEditModal} handleDelete={handleOpenDeleteModal} />}
-                {activeTab === 'monthly' && <MonthlyView householdId={householdId} transactions={transactions} handleEdit={handleOpenEditModal} handleDelete={handleOpenDeleteModal} />}
+                {activeTab === 'monthly' && <MonthlyView householdId={householdId} transactions={transactions} handleEdit={handleOpenEditModal} handleDelete={handleOpenDeleteModal} household={household} />}
             </main>
 
+            <WeekSettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} household={household} householdId={householdId} />
             <EditTransactionModal isOpen={!!editingTransaction} onClose={handleCloseModals} transaction={editingTransaction} onSave={handleSaveTransaction} />
             <ConfirmationModal isOpen={!!deletingTransaction} onClose={handleCloseModals} onConfirm={handleDeleteConfirm} title="Confirmar Exclusão">
                 <p>Você tem certeza que deseja excluir esta transação?</p>
