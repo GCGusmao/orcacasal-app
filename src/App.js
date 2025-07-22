@@ -81,7 +81,7 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, children }) => (
     </Modal>
 );
 
-const EditTransactionModal = ({ isOpen, onClose, transaction, onSave, household }) => {
+const EditTransactionModal = ({ isOpen, onClose, transaction, onSave, household, householdId, onDeleteTag }) => {
     const [amount, setAmount] = useState('');
     const [description, setDescription] = useState('');
     const [tag, setTag] = useState('');
@@ -146,16 +146,24 @@ const EditTransactionModal = ({ isOpen, onClose, transaction, onSave, household 
                         className="p-2 border rounded-md w-full bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600" 
                         autoComplete="off"
                     />
-                     {isSuggestionsOpen && suggestions.length > 0 && (
+                     {isSuggestionsOpen && (
                         <ul className="absolute z-20 w-full bg-white dark:bg-gray-800 border dark:border-gray-600 rounded-md mt-1 max-h-40 overflow-y-auto shadow-lg">
                             {suggestions.map(s => (
                                 <li 
                                     key={s} 
-                                    onMouseDown={() => handleSuggestionClick(s)}
-                                    className="px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 flex items-center gap-2"
+                                    className="px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 flex items-center justify-between gap-2"
                                 >
-                                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: household.tags[s]?.color || '#ccc' }}></span>
-                                    {s}
+                                    <div onMouseDown={() => handleSuggestionClick(s)} className="flex items-center gap-2 w-full">
+                                        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: household.tags[s]?.color || '#ccc' }}></span>
+                                        <span>{s}</span>
+                                    </div>
+                                    <button 
+                                        type="button"
+                                        onMouseDown={(e) => { e.stopPropagation(); onDeleteTag(s); }} 
+                                        className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 font-bold"
+                                    >
+                                        &times;
+                                    </button>
                                 </li>
                             ))}
                         </ul>
@@ -299,7 +307,7 @@ const HouseholdSetup = ({ user, setHouseholdId }) => {
     );
 };
 
-const TransactionForm = ({ householdId, type, household }) => {
+const TransactionForm = ({ householdId, type, household, onDeleteTag }) => {
     const [amount, setAmount] = useState('');
     const [description, setDescription] = useState('');
     const [tag, setTag] = useState('');
@@ -325,13 +333,6 @@ const TransactionForm = ({ householdId, type, household }) => {
     const handleSuggestionClick = (suggestion) => {
         setTag(suggestion);
         setIsSuggestionsOpen(false);
-    };
-
-    const handleDeleteTag = async (tagToDelete) => {
-        const newTags = { ...household.tags };
-        delete newTags[tagToDelete];
-        const householdRef = doc(db, 'households', householdId);
-        await setDoc(householdRef, { tags: newTags }, { merge: true });
     };
     
     const handleSubmit = async (e) => {
@@ -406,7 +407,7 @@ const TransactionForm = ({ householdId, type, household }) => {
                                     </div>
                                     <button 
                                         type="button"
-                                        onMouseDown={(e) => { e.stopPropagation(); handleDeleteTag(s); }} 
+                                        onMouseDown={(e) => { e.stopPropagation(); onDeleteTag(s); }} 
                                         className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 font-bold"
                                     >
                                         &times;
@@ -463,7 +464,7 @@ const TransactionList = ({ transactions, onEdit, onDelete, household }) => {
     )
 }
 
-const WeeklyView = ({ householdId, household, transactions, handleEdit, handleDelete }) => {
+const WeeklyView = ({ householdId, household, transactions, handleEdit, handleDelete, onDeleteTag }) => {
     const [newBudget, setNewBudget] = useState(household.weeklyBudget || 0);
 
     const { weeklyExpenses, remainingBudget } = useMemo(() => {
@@ -519,7 +520,7 @@ const WeeklyView = ({ householdId, household, transactions, handleEdit, handleDe
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md"><TransactionForm householdId={householdId} type="weekly" household={household} /></div>
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md"><TransactionForm householdId={householdId} type="weekly" household={household} onDeleteTag={onDeleteTag} /></div>
             <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
                 <h3 className="font-bold text-xl mb-4 text-gray-800 dark:text-gray-100">Gastos da Semana</h3>
                 <TransactionList transactions={weeklyExpenses} onEdit={handleEdit} onDelete={handleDelete} household={household} />
@@ -528,7 +529,7 @@ const WeeklyView = ({ householdId, household, transactions, handleEdit, handleDe
     );
 };
 
-const MonthlyView = ({ householdId, transactions, handleEdit, handleDelete, household }) => {
+const MonthlyView = ({ householdId, transactions, handleEdit, handleDelete, household, onDeleteTag }) => {
     const [analysis, setAnalysis] = useState("");
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [viewDate, setViewDate] = useState(new Date());
@@ -628,7 +629,7 @@ const MonthlyView = ({ householdId, transactions, handleEdit, handleDelete, hous
                 {isAnalyzing && (<div className="flex justify-center items-center p-8"><div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-indigo-500"></div></div>)}
                 {analysis && (<div className="mt-4 p-4 bg-indigo-50 dark:bg-gray-700/50 border border-indigo-200 dark:border-gray-600 rounded-lg whitespace-pre-wrap font-sans text-gray-700 dark:text-gray-300">{analysis}</div>)}
             </div>
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md"><TransactionForm householdId={householdId} type="monthly" household={household} /></div>
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md"><TransactionForm householdId={householdId} type="monthly" household={household} onDeleteTag={onDeleteTag} /></div>
             <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-md">
                 <h3 className="font-bold text-xl mb-4 text-gray-800 dark:text-gray-100">Todas as Transações do Mês</h3>
                 <TransactionList transactions={monthlyExpenses} onEdit={handleEdit} onDelete={handleDelete} household={household} />
@@ -644,15 +645,18 @@ const Dashboard = ({ user, householdId, household, transactions, theme, onThemeT
     const [deleteScope, setDeleteScope] = useState('single');
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+    const [tagToDelete, setTagToDelete] = useState(null);
 
     const handleSignOut = async () => { try { await signOut(auth); } catch (error) { console.error("Erro ao fazer logout:", error); } };
     const copyToClipboard = () => { navigator.clipboard.writeText(householdId).then(() => alert('ID do Lar copiado!'), (err) => console.error('Falha ao copiar: ', err)); };
 
     const handleOpenEditModal = (transaction) => setEditingTransaction(transaction);
     const handleOpenDeleteModal = (transaction) => setDeletingTransaction(transaction);
+    const handleOpenDeleteTagModal = (tag) => setTagToDelete(tag);
     const handleCloseModals = () => {
         setEditingTransaction(null);
         setDeletingTransaction(null);
+        setTagToDelete(null);
         setDeleteScope('single');
     };
 
@@ -662,7 +666,6 @@ const Dashboard = ({ user, householdId, household, transactions, theme, onThemeT
         const allTags = household.tags || {};
         const tag = updatedTransaction.tag;
 
-        // Adiciona a nova tag se ela não existir
         if (!allTags[tag]) {
             const randomColor = `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`;
             const newTags = { ...allTags, [tag]: { color: randomColor } };
@@ -697,6 +700,37 @@ const Dashboard = ({ user, householdId, household, transactions, theme, onThemeT
             handleCloseModals();
         } catch (error) {
             console.error("Erro ao excluir transação:", error);
+        }
+    };
+
+    const handleConfirmDeleteTag = async () => {
+        if (!tagToDelete) return;
+
+        const batch = writeBatch(db);
+
+        const q = query(collection(db, 'transactions'), where("householdId", "==", householdId), where("tag", "==", tagToDelete));
+        const querySnapshot = await getDocs(q);
+        
+        querySnapshot.forEach(doc => {
+            batch.update(doc.ref, { tag: 'Sem categoria' });
+        });
+
+        const householdRef = doc(db, 'households', householdId);
+        const newTags = { ...household.tags };
+        delete newTags[tagToDelete];
+
+        if (!newTags['Sem categoria']) {
+            newTags['Sem categoria'] = { color: '#cccccc' };
+        }
+
+        batch.update(householdRef, { tags: newTags });
+
+        try {
+            await batch.commit();
+        } catch (error) {
+            console.error("Erro ao excluir e atualizar tags:", error);
+        } finally {
+            handleCloseModals();
         }
     };
 
@@ -741,12 +775,12 @@ const Dashboard = ({ user, householdId, household, transactions, theme, onThemeT
                     <button onClick={() => setActiveTab('monthly')} className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'monthly' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-600'}`}>Visão Mensal</button>
                 </nav></div></div>
                 
-                {activeTab === 'weekly' && <WeeklyView householdId={householdId} household={household} transactions={transactions} handleEdit={handleOpenEditModal} handleDelete={handleOpenDeleteModal} />}
-                {activeTab === 'monthly' && <MonthlyView householdId={householdId} transactions={transactions} handleEdit={handleOpenEditModal} handleDelete={handleOpenDeleteModal} household={household} />}
+                {activeTab === 'weekly' && <WeeklyView householdId={householdId} household={household} transactions={transactions} handleEdit={handleOpenEditModal} handleDelete={handleOpenDeleteModal} onDeleteTag={handleOpenDeleteTagModal} />}
+                {activeTab === 'monthly' && <MonthlyView householdId={householdId} transactions={transactions} handleEdit={handleOpenEditModal} handleDelete={handleOpenDeleteModal} household={household} onDeleteTag={handleOpenDeleteTagModal} />}
             </main>
 
             <WeekSettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} household={household} householdId={householdId} />
-            <EditTransactionModal isOpen={!!editingTransaction} onClose={handleCloseModals} transaction={editingTransaction} onSave={handleSaveTransaction} household={household} />
+            <EditTransactionModal isOpen={!!editingTransaction} onClose={handleCloseModals} transaction={editingTransaction} onSave={handleSaveTransaction} household={household} onDeleteTag={handleOpenDeleteTagModal} />
             <ConfirmationModal isOpen={!!deletingTransaction} onClose={handleCloseModals} onConfirm={handleDeleteConfirm} title="Confirmar Exclusão">
                 <p>Você tem certeza que deseja excluir esta transação?</p>
                 <p className="font-semibold mt-2">{deletingTransaction?.description}: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(deletingTransaction?.amount || 0)}</p>
@@ -756,6 +790,10 @@ const Dashboard = ({ user, householdId, household, transactions, theme, onThemeT
                         <label className="flex items-center"><input type="radio" name="deleteScope" value="all" checked={deleteScope === 'all'} onChange={() => setDeleteScope('all')} className="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500" /><span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Excluir esta e todas as parcelas futuras</span></label>
                     </div>
                 )}
+            </ConfirmationModal>
+            <ConfirmationModal isOpen={!!tagToDelete} onClose={handleCloseModals} onConfirm={handleConfirmDeleteTag} title="Confirmar Exclusão de Tag">
+                <p>Você tem certeza que deseja excluir a tag <span className="font-bold">{tagToDelete}</span>?</p>
+                <p className="mt-2 text-sm">Todos os lançamentos com esta tag serão movidos para "Sem categoria".</p>
             </ConfirmationModal>
         </div>
     );
