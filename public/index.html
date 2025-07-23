@@ -4,27 +4,38 @@
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
+
+    <!-- Theme Color para Modo Claro e Escuro -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f3f4f6">
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#111827">
+
     <meta
       name="description"
-      content="Web site created using create-react-app"
+      content="OrçaCasal - Gerencie as finanças do casal de forma simples e colaborativa."
     />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
-    <!--
-      manifest.json provides metadata used when your web app is installed on a
-      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
-    -->
-    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <!--
-      Notice the use of %PUBLIC_URL% in the tags above.
-      It will be replaced with the URL of the `public` folder during the build.
-      Only files inside the `public` folder can be referenced from the HTML.
 
-      Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
-      work correctly both with client-side routing and a non-root public URL.
-      Learn how to configure a non-root public URL by running `npm run build`.
-    -->
-    <title>React App</title>
+    <!-- Link para o Manifest -->
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+
+    <!-- Tags para Apple/iOS -->
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/icons/icon-192x192.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="OrçaCasal" />
+
+    <title>OrçaCasal</title>
+
+    <!-- Estilo inicial para evitar fundo branco no modo escuro em PWA -->
+    <style>
+      body {
+        background-color: #f3f4f6; /* Cor de fundo padrão (claro) */
+      }
+      @media (prefers-color-scheme: dark) {
+        body {
+          background-color: #111827; /* Cor de fundo para modo escuro */
+        }
+      }
+    </style>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
