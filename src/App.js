@@ -809,13 +809,21 @@ export default function App() {
     const [household, setHousehold] = useState(null);
     const [transactions, setTransactions] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [theme, setTheme] = useState('light'); // Estado para o tema
+    const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light'); // Estado para o tema
 
-    // Efeito para aplicar a classe do tema no HTML
+    // Efeito para aplicar a classe do tema no HTML e a cor do navegador
     useEffect(() => {
         const root = window.document.documentElement;
+        const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+        
         root.classList.remove('light', 'dark');
         root.classList.add(theme);
+        localStorage.setItem('theme', theme);
+
+        if (themeColorMeta) {
+            const newColor = theme === 'dark' ? '#111827' : '#f3f4f6';
+            themeColorMeta.setAttribute('content', newColor);
+        }
     }, [theme]);
 
     // Efeito para gerenciar o estado de autenticação.
@@ -842,10 +850,11 @@ export default function App() {
             if (docSnap.exists()) {
                 const userData = docSnap.data();
                 setHouseholdId(userData.householdId || null);
-                setTheme(userData.theme || 'light'); // Carrega o tema salvo ou usa 'light'
+                const savedTheme = userData.theme || localStorage.getItem('theme') || 'light';
+                setTheme(savedTheme);
             } else {
                 setHouseholdId(null);
-                setTheme('light'); // Padrão para novos usuários
+                setTheme(localStorage.getItem('theme') || 'light');
             }
             
             if (!docSnap.data()?.householdId) {

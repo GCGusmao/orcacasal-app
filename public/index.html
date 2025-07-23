@@ -5,9 +5,8 @@
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- Theme Color para Modo Claro e Escuro -->
-    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f3f4f6">
-    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#111827">
+    <!-- Cor do tema que será atualizada dinamicamente -->
+    <meta name="theme-color" content="#f3f4f6" />
 
     <meta
       name="description"
@@ -20,22 +19,33 @@
     <!-- Tags para Apple/iOS -->
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/icons/icon-192x192.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="OrçaCasal" />
 
     <title>OrçaCasal</title>
 
-    <!-- Estilo inicial para evitar fundo branco no modo escuro em PWA -->
-    <style>
-      body {
-        background-color: #f3f4f6; /* Cor de fundo padrão (claro) */
-      }
-      @media (prefers-color-scheme: dark) {
-        body {
-          background-color: #111827; /* Cor de fundo para modo escuro */
-        }
-      }
-    </style>
+    <!-- Script para aplicar o tema salvo ANTES do React carregar -->
+    <script>
+      (function() {
+        try {
+          var theme = localStorage.getItem('theme');
+          var themeColorMeta = document.querySelector('meta[name="theme-color"]');
+
+          // Se o tema salvo for escuro, ou se não houver tema salvo E o sistema operacional for escuro
+          if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+            if (themeColorMeta) {
+              themeColorMeta.setAttribute('content', '#111827'); // Cor de fundo escura
+            }
+          } else {
+            document.documentElement.classList.remove('dark');
+            if (themeColorMeta) {
+              themeColorMeta.setAttribute('content', '#f3f4f6'); // Cor de fundo clara
+            }
+          }
+        } catch (_) {}
+      })();
+    </script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
