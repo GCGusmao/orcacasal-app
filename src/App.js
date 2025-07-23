@@ -287,6 +287,7 @@ const HouseholdSetup = ({ user, setHouseholdId }) => {
             }
         } catch (error) {
             console.error("Erro ao entrar no lar:", error);
+            alert(`Não foi possível entrar no lar. Verifique o ID e suas permissões. Erro: ${error.message}`);
         }
     };
 
